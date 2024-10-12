@@ -14,6 +14,7 @@ export function useTwitchChat() {
   const [client, setClient] = useState<tmi.Client | null>(null);
   const [messages, setMessages] = useState<TwitchMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionStartTime, setConnectionStartTime] = useState<Date | null>(null);
 
   const connect = useCallback((channel: string) => {
     const newClient = new tmi.Client({
@@ -44,16 +45,41 @@ export function useTwitchChat() {
 
     setClient(newClient);
     setIsConnected(true);
+    setConnectionStartTime(new Date());
   }, []);
 
-  const disconnect = useCallback(() => {
-    if (client) {
+  const disconnect = useCallback(async () => {
+    if (client && connectionStartTime) {
       client.disconnect();
       setClient(null);
       setIsConnected(false);
       setMessages([]);
+
+      // Download messages
+      try {
+        const response = await fetch(`/api/messages?startTime=${connectionStartTime.toISOString()}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        const messages = await response.json();
+        
+        // Create and download JSON file
+        const blob = new Blob([JSON.stringify(messages, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'twitch_messages.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading messages:', error);
+      }
+
+      setConnectionStartTime(null);
     }
-  }, [client]);
+  }, [client, connectionStartTime]);
 
   useEffect(() => {
     return () => {
