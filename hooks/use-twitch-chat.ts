@@ -35,14 +35,23 @@ export function useTwitchChat() {
       };
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
+      if (window && localStorage) {
+        const storedMessages = JSON.parse(
+          localStorage.getItem("messages") || "[]"
+        ) as TwitchMessage[];
+        localStorage.setItem(
+          "messages",
+          JSON.stringify([...storedMessages, newMessage])
+        );
+      }
       // Send message to the server to be stored in the database
-      fetch("/api/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newMessage),
-      }).catch(console.error);
+      // fetch("/api/messages", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify(newMessage),
+      // }).catch(console.error);
     });
 
     setClient(newClient);
@@ -59,14 +68,18 @@ export function useTwitchChat() {
 
       // Download messages
       try {
-        const response = await fetch(
-          `/api/messages?startTime=${connectionStartTime.toISOString()}`
+        const response = JSON.parse(localStorage.getItem("messages") || "[]");
+        const messages = response.filter(
+          (m: TwitchMessage) =>
+            new Date(m.timestamp).getTime() >= connectionStartTime.getTime()
         );
-        if (!response.ok) {
-          throw new Error("Failed to fetch messages");
-        }
-        const messages = await response.json();
-
+        // const response = await fetch(
+        //   `/api/messages?startTime=${connectionStartTime.toISOString()}`
+        // );
+        // if (!response.ok) {
+        //   throw new Error("Failed to fetch messages");
+        // }
+        // const messages = await response.json();
         // Create and download JSON file
         const blob = new Blob([JSON.stringify(messages, null, 2)], {
           type: "application/json",
