@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -18,6 +18,7 @@ const formSchema = z.object({
 export default function Home() {
   const [channel, setChannel] = useState('');
   const { messages, isConnected, connect, disconnect } = useTwitchChat();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -30,6 +31,10 @@ export default function Home() {
     setChannel(values.channel);
     connect(values.channel);
   }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   return (
     <div className="container mx-auto p-4">
@@ -71,6 +76,7 @@ export default function Home() {
               <span>{msg.message}</span>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
       </div>
     </div>
