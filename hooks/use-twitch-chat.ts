@@ -2,12 +2,49 @@
 
 import { useState, useEffect, useCallback } from "react";
 import tmi from "tmi.js";
+import { openDB } from "idb";
 
 interface TwitchMessage {
   channel: string;
   username: string;
   message: string;
   timestamp: Date;
+}
+const DB_NAME = "TwitchMessagesDB";
+const STORE_NAME = "messages";
+
+async function getDB() {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, {
+          keyPath: "id",
+          autoIncrement: true,
+        });
+      }
+    },
+  });
+}
+
+async function saveMessage(newMessage: TwitchMessage) {
+  const db = await getDB();
+  await db.add(STORE_NAME, newMessage);
+}
+
+async function getFilteredMessages(
+  connectionStartTime: Date
+): Promise<TwitchMessage[]> {
+  const db = await getDB();
+  const allMessages = await db.getAll(STORE_NAME);
+
+  // Filter messages based on the timestamp
+  const filteredMessages = allMessages.filter((message: TwitchMessage) => {
+    return (
+      new Date(message.timestamp).getTime() >= connectionStartTime.getTime()
+    );
+  });
+
+  return filteredMessages as TwitchMessage[];
 }
 
 export function useTwitchChat() {
@@ -35,15 +72,16 @@ export function useTwitchChat() {
       };
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
-      if (window && localStorage) {
-        const storedMessages = JSON.parse(
-          localStorage.getItem("messages") || "[]"
-        ) as TwitchMessage[];
-        localStorage.setItem(
-          "messages",
-          JSON.stringify([...storedMessages, newMessage])
-        );
-      }
+      saveMessage(newMessage);
+      // if (window && localStorage) {
+      //   const storedMessages = JSON.parse(
+      //     localStorage.getItem("messages") || "[]"
+      //   ) as TwitchMessage[];
+      //   localStorage.setItem(
+      //     "messages",
+      //     JSON.stringify([...storedMessages, newMessage])
+      //   );
+      // }
       // Send message to the server to be stored in the database
       // fetch("/api/messages", {
       //   method: "POST",
@@ -68,11 +106,12 @@ export function useTwitchChat() {
 
       // Download messages
       try {
-        const response = JSON.parse(localStorage.getItem("messages") || "[]");
-        const messages = response.filter(
-          (m: TwitchMessage) =>
-            new Date(m.timestamp).getTime() >= connectionStartTime.getTime()
-        );
+        const messages = await getFilteredMessages(connectionStartTime);
+        // const response = JSON.parse(localStorage.getItem("messages") || "[]");
+        // const messages = response.filter(
+        //   (m: TwitchMessage) =>
+        //     new Date(m.timestamp).getTime() >= connectionStartTime.getTime()
+        // );
         // const response = await fetch(
         //   `/api/messages?startTime=${connectionStartTime.toISOString()}`
         // );
